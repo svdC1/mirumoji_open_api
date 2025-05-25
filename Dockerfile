@@ -1,0 +1,41 @@
+# Image with NVIDIA libs required for Faster-Whisper
+FROM python:3.11-slim-bookworm
+
+# Set working directory
+WORKDIR /app
+
+# Set env
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PATH="/usr/local/bin:${PATH}"
+
+# --- Install System Dependencies ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget xz-utils git \
+    mecab libmecab-dev mecab-ipadic-utf8 \
+    ffmpeg
+# --- Upgrade PIP ---
+RUN python3.11 -m ensurepip --upgrade && \
+    python3.11 -m pip install --no-cache-dir --upgrade pip
+
+# --- Install PyTorch CPU ---
+RUN python3.11 -m pip install --no-cache-dir \
+    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# --- Download jamdict.db ---
+RUN mkdir -p /root/.jamdict/data && \
+    wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1QZRzOoMF4CGlkdl0FyU7ledAZLRlpoom' \
+    -O /tmp/jamdict.db.xz && \
+    unxz /tmp/jamdict.db.xz && \
+    mv /tmp/jamdict.db /root/.jamdict/data/jamdict.db
+
+# --- Install Python Packages ---
+COPY requirements.txt .
+RUN python3.11 -m pip install --no-cache-dir -r requirements.txt
+
+# --- Download UniDic Dictionary ---
+RUN python3.11 -m unidic download
+
+# Copy app code
+COPY . .

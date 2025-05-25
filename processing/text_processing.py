@@ -80,7 +80,8 @@ class GptExplainService:
 
     def __init__(self,
                  gpt_model: Optional[GptModel] = None,
-                 version: str = "gpt-4.1-mini"):
+                 gpt_model_kwargs: Dict = {},
+                 version: str = "gpt-4.1-mini",):
         # Cure Dolly-style system message
         system_msg = """
         You are a Japanese language API that explains the specific nuance of
@@ -94,9 +95,9 @@ class GptExplainService:
         DO NOT OUTPUT romaji/furigana or any notes on pronunciation;
         Conclude with the specific nuance within the context sentence.
         """
-
-        self.model = gpt_model if gpt_model else GptModel(version,
-                                                          system_msg)
+        gpt_model_kwargs["system_msg"] = system_msg
+        gpt_model_kwargs["version"] = version
+        self.model = gpt_model if gpt_model else GptModel(**gpt_model_kwargs)
         self.sys_msg = system_msg
         self.version = version
 
@@ -193,10 +194,13 @@ class SentenceBreakdownService:
     into a full grammar breakdown for a sentence.
     """
 
-    def __init__(self):
+    def __init__(self,
+                 gpt_version: str = "gpt-4.1-mini",
+                 gpt_kwargs: Dict = {}):
         self.tokenizer = TokenizerService()
         self.word_info = WordInfoService()
-        self.gpt_explainer = GptExplainService()
+        self.gpt_explainer = GptExplainService(gpt_model_kwargs=gpt_kwargs,
+                                               version=gpt_version)
 
     def word_lookup(self, sentence: str) -> List[Dict]:
         tokens = self.tokenizer.tokenize(sentence)

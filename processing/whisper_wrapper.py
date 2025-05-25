@@ -185,7 +185,8 @@ class FWhisperWrapper:
 
         if fix_with_chat_gpt:
             try:
-                rsrt = self.gpt_fix_srt(srt.compose(subtitles))
+                rsrt = self.gpt_fix_srt(srt.compose(subtitles),
+                                        gpt_model_kwargs)
                 if not rsrt:
                     return None
 
