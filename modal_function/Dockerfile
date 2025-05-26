@@ -1,0 +1,28 @@
+# ── CUDA 12.3 + cuDNN 9 runtime ──────────────────────────────────────
+FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
+
+# ── System deps & Python shim ────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg git \
+    python3.11 python3.11-dev python3.11-venv python3-pip \
+    python-is-python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONUNBUFFERED=1 PATH="/usr/local/bin:${PATH}"
+
+# ── Core Python packages (CUDA 12.4 wheels) ──────────────────────────
+RUN python -m pip install --no-cache-dir --upgrade pip && \
+    python -m pip install --no-cache-dir \
+    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+    faster-whisper==1.1.1 \
+    huggingface_hub \
+    srt requests sentencepiece \
+    openai python-dotenv pydantic modal
+
+# ── Pre-cache the Faster-Whisper model ──────
+RUN python -c "from huggingface_hub import snapshot_download; \
+    snapshot_download('Systran/faster-whisper-large-v3', local_dir_use_symlinks=False)"
+
+
+WORKDIR /app
+COPY . .

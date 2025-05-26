@@ -1,12 +1,12 @@
 from typing import Optional, Union, Dict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import os
 import logging
 from processing.text_processing import SentenceBreakdownService
 from processing.audio_processing import AudioTools
 from processing.whisper_wrapper import FWhisperWrapper
 from dotenv import load_dotenv
+from utils.env_utils import check_env
 
 
 class Processor:
@@ -40,35 +40,19 @@ class Processor:
         # Configure API Keys
         load_dotenv(dotenv_path=dotenv_path)
         if use_modal:
-            expected_keys = ["OPENAI_API_KEY",
-                             "MODAL_TOKEN_ID",
-                             "MODAL_TOKEN_SECRET"]
+            expected_keys = {"OPENAI_API_KEY": OPENAI_API_KEY,
+                             "MODAL_TOKEN_ID": MODAL_TOKEN_ID,
+                             "MODAL_TOKEN_SECRET": MODAL_TOKEN_SECRET}
         else:
             self.logger.info("Not using Modal")
-            expected_keys = ["OPENAI_API_KEY"]
+            expected_keys = {"OPENAI_API_KEY": OPENAI_API_KEY}
         self.use_modal = use_modal
-        API_KEYS = {k: v for k, v in os.environ.items() if k in expected_keys}
-        self.logger.info(f"Retrieved {','.join(API_KEYS.keys())} from ENV")
-        missing_keys = [k for k in expected_keys if k not in API_KEYS.keys()]
-        self.logger.info(f"{','.join(missing_keys)} not found in ENV")
-        if missing_keys:
-            for mk in missing_keys:
-                if mk == expected_keys[0]:
-                    if not OPENAI_API_KEY:
-                        raise ValueError("Could not find OPENAI_API_KEY")
-                    API_KEYS[expected_keys[0]] = OPENAI_API_KEY
-                elif mk == expected_keys[1]:
-                    if not MODAL_TOKEN_ID:
-                        raise ValueError("Could not find MODAL_TOKEN_ID")
-                    API_KEYS[expected_keys[1]] = MODAL_TOKEN_ID
-                elif mk == expected_keys[2]:
-                    if not MODAL_TOKEN_SECRET:
-                        raise ValueError("Could not find MODAL_TOKEN_SECRET")
-                    API_KEYS[expected_keys[2]] = MODAL_TOKEN_SECRET
-        self.API_KEYS = API_KEYS
+        self.API_KEYS = check_env(expected_keys.keys(),
+                                  expected_keys,
+                                  dotenv_path)
         # Initializing Instances
         gpt_kwargs = {"from_dotenv": False,
-                      "ApiKey": self.API_KEYS[expected_keys[0]]}
+                      "ApiKey": self.API_KEYS["OPENAI_API_KEY"]}
         self.sentence_breakdown_service = SentenceBreakdownService(gpt_version,
                                                                    gpt_kwargs)
         if not save_path:
