@@ -13,13 +13,13 @@ audio_tools = processor.audio_tools
 gpt_explain_service = processor.sentence_breakdown_service.gpt_explainer
 
 
-@audio_router.post("/srt_from_s3")
+@audio_router.post("/srt_from_audio")
 async def srt_from_audio():
 
     return None
 
 
-@audio_router.post("/convert_from_s3")
+@audio_router.post("/convert_to_mp4")
 async def convert_to_mp4():
     return None
 
