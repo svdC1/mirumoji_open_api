@@ -56,6 +56,15 @@ jobs:
                       type=sha,prefix=
                       type=raw,value=latest,enable={{is_default_branch}}
 
+            - name: Clean up disk space before build
+              run: |
+                  docker system prune -af || true
+                  sudo rm -rf /usr/share/dotnet || true
+                  sudo rm -rf /usr/local/lib/android || true
+                  sudo rm -rf /opt/ghc || true
+                  sudo rm -rf /tmp/* || true
+                  sudo apt-get clean
+
             # Build and push the Docker image
             - name: Build and push Docker image
               uses: docker/build-push-action@v5

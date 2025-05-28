@@ -172,7 +172,7 @@ async def get_saved_clips(profile_id: str = Depends(ensure_profile_exists)):
     return [
         ClipResponse(id=c.id,
                      get_url=f"/media/{c.video_clip_path}",
-                     breakdown_response=c.gpt_breakdown_response
+                     breakdown_response=json.dumps(c.gpt_breakdown_response)
                      ) for c in await db.fetch_all(query)]
 
 
@@ -209,7 +209,7 @@ async def delete_saved_clip(clipId: str = Path(...,
     return {"success": True, "message": "Clip deleted successfully."}
 
 
-# --- Profile File Management --- (collapsed)
+# --- Profile File Management
 @profile_router.get("/files", response_model=List[ProfileFileResponse])
 async def get_profile_files(profile_id: str = Depends(ensure_profile_exists)):
     if not profile_id:
