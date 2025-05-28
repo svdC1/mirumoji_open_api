@@ -46,7 +46,6 @@ class Processor:
         else:
             self.logger.info("Not using Modal")
             expected_keys = {"OPENAI_API_KEY": OPENAI_API_KEY}
-        self.use_modal = use_modal
         self.API_KEYS = check_env(expected_keys.keys(),
                                   expected_keys,
                                   dotenv_path)
@@ -60,7 +59,35 @@ class Processor:
         else:
             self.audio_tools = AudioTools(self.save_path)
         self.fwhisper = FWhisperWrapper(**whisper_kwargs)
+        # Save attrs
+        self.save_path_input = save_path
+        self.use_modal = use_modal
+        self.gpt_version = gpt_version
+        self.dotenv_path = dotenv_path
+        self.whisper_kwargs = whisper_kwargs
+        self.openai_key_input = OPENAI_API_KEY
+        self.modal_token_id_input = MODAL_TOKEN_ID
+        self.modal_token_secret_input = MODAL_TOKEN_SECRET
         self.logger.info("Processor Initialized")
+
+    def __str__(self):
+        if isinstance(self.save_path, TemporaryDirectory):
+            return str(Path(self.save_path.name).resolve())
+        return str(Path(self.save_path).resolve())
+
+    def __repr__(self):
+        args = {
+            "save_path": self.save_path_input,
+            "use_modal": self.use_modal,
+            "gpt_version": self.gpt_version,
+            "dotenv_path": self.dotenv_path,
+            "whisper_kwargs": self.whisper_kwargs,
+            "OPENAI_API_KEY": self.openai_key_input,
+            "MODAL_TOKEN_ID": self.modal_token_id_input,
+            "MODAL_TOKEN_SECRET": self.modal_token_secret_input
+                }
+        arg_s = ','.join([f"{k}={v}" for k, v in args.items()])
+        return f"Processor({arg_s})"
 
     def __del__(self):
         if isinstance(self.save_path, TemporaryDirectory):
