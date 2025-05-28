@@ -12,3 +12,5 @@ uvicorn==0.34.2
 pydantic[email]
 modal==0.75.6
 genanki==0.13.1
+databases==0.9.0
+aiosqlite==0.20.0

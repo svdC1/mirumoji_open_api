@@ -1,41 +1,64 @@
-# Image with NVIDIA libs required for Faster-Whisper
-FROM python:3.11-slim-bookworm
+# Use the NVIDIA CUDA runtime image as the base for GPU support
+FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
 
-# Set working directory
-WORKDIR /app
-
-# Set env
+# Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    PATH="/usr/local/bin:${PATH}"
+    PATH="/usr/local/bin:${PATH}" \
+    PIP_NO_CACHE_DIR=1
 
-# --- Install System Dependencies ---
+# Install system dependencies from both Dockerfiles
+# Includes build-essential for some python packages, git, ffmpeg, mecab
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget xz-utils git \
+    build-essential \
+    git \
+    ffmpeg \
+    wget xz-utils \
     mecab libmecab-dev mecab-ipadic-utf8 \
-    ffmpeg
-# --- Upgrade PIP ---
-RUN python3.11 -m ensurepip --upgrade && \
-    python3.11 -m pip install --no-cache-dir --upgrade pip
+    python3.11 python3.11-dev python3.11-venv python3-pip \
+    python-is-python3 \
+    && rm -rf /var/lib/apt/lists/*
 
-# --- Install PyTorch CPU ---
-RUN python3.11 -m pip install --no-cache-dir \
+# Upgrade pip (using the python from the base image)
+RUN python -m pip install --upgrade pip
+
+# Install PyTorch with CUDA support
+# Specify index URL for CUDA 12.1 compatible wheels, suitable for CUDA 12.3 base image.
+RUN python -m pip install \
     torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
-    --index-url https://download.pytorch.org/whl/cpu
+    --index-url https://download.pytorch.org/whl/cu121
 
-# --- Download jamdict.db ---
+# Install Helpers
+
+RUN python -m pip install \
+    huggingface_hub \
+    requests sentencepiece
+
+# Download jamdict.db
 RUN mkdir -p /root/.jamdict/data && \
     wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1QZRzOoMF4CGlkdl0FyU7ledAZLRlpoom' \
     -O /tmp/jamdict.db.xz && \
     unxz /tmp/jamdict.db.xz && \
     mv /tmp/jamdict.db /root/.jamdict/data/jamdict.db
 
-# --- Install Python Packages ---
+# Set working directory
+WORKDIR /app
+
+# Copy requirements.txt and install all dependencies
 COPY requirements.txt .
-RUN python3.11 -m pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install -r requirements.txt
 
-# --- Download UniDic Dictionary ---
-RUN python3.11 -m unidic download
+# Download UniDic Dictionary
+RUN python -m unidic download
 
-# Copy app code
+# Pre-cache the Faster-Whisper model (from modal Dockerfile)
+RUN python -c "from huggingface_hub import snapshot_download; \
+    snapshot_download('Systran/faster-whisper-large-v3', local_dir_use_symlinks=False)"
+
+# Copy the rest of the application code
 COPY . .
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

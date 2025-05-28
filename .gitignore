@@ -177,3 +177,5 @@ cython_debug/
 #Temp
 temp_uploads/*
 temp/*
+# IDE
+.vscode/*
