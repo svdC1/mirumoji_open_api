@@ -24,14 +24,11 @@ RUN python -m pip install --upgrade pip
 
 # Install PyTorch with CUDA support
 # Specify index URL for CUDA 12.1 compatible wheels, suitable for CUDA 12.3 base image.
-RUN python -m pip install \
-    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
-    --index-url https://download.pytorch.org/whl/cu121
+RUN python -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu121
 
 # Install Helpers
 
-RUN python -m pip install \
-    huggingface_hub \
+RUN python -m pip install huggingface_hub \
     requests sentencepiece
 
 # Download jamdict.db
