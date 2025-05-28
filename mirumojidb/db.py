@@ -14,9 +14,9 @@ async def get_db() -> Database:
     return database
 
 
-async def connect_db(self) -> None:
-    await self.database.connect()
+async def connect_db() -> None:
+    await database.connect()
 
 
-async def disconnect_db(self) -> None:
-    await self.database.disconnect()
+async def disconnect_db() -> None:
+    await database.disconnect()

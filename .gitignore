@@ -179,3 +179,6 @@ temp_uploads/*
 temp/*
 # IDE
 .vscode/*
+# Database/Media
+mirumojidb.db
+media_files/*
