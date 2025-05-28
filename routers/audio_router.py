@@ -13,7 +13,10 @@ from fastapi import (
 )
 from processing.Processor import Processor
 from profile_manager import ensure_profile_exists
-from database import get_db, profile_transcripts, profile_files
+from mirumojidb.db import get_db
+from mirumojidb.Tables import (profile_transcripts,
+                               profile_files
+                               )
 
 logger = logging.getLogger(__name__)
 audio_router = APIRouter(prefix='/audio')

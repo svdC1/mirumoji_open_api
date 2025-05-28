@@ -9,12 +9,21 @@ from fastapi import (
     APIRouter, Depends, HTTPException, status,
     File, UploadFile, Form, Path
 )
-from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from models.GptTemplateResponse import GptTemplateResponse
+from models.GptTemplateBase import GptTemplateBase
+from models.ClipResponse import ClipResponse
+from models.ProfileFileResponse import ProfileFileResponse
+from models.ProfileTranscriptResponse import ProfileTranscriptResponse
+from models.AnkiExportResponse import AnkiExportResponse
+from typing import Optional, List
 import genanki
 
-from database import (get_db, gpt_templates, clips, profile_files,
-                      profile_transcripts)
+from mirumojidb.db import get_db
+from mirumojidb.Tables import (gpt_templates,
+                               clips,
+                               profile_files,
+                               profile_transcripts
+                               )
 from profile_manager import ensure_profile_exists
 
 logger = logging.getLogger(__name__)
@@ -26,45 +35,9 @@ TEMP_MEDIA_PATH = os.path.join(BASE_MEDIA_PATH, "temp")
 os.makedirs(TEMP_MEDIA_PATH, exist_ok=True)
 
 
-# --- Pydantic Models ---
-class GptTemplateBase(BaseModel):
-    sys_msg: str = Field(..., alias="sysMsg")
-    prompt: str
-
-
-class GptTemplateResponse(GptTemplateBase):
-    id: str
-
-
-class ClipResponse(BaseModel):
-    id: str
-    get_url: str
-    breakdown_response: Any
-
-
-class ProfileFileResponse(BaseModel):
-    id: str
-    file_name: str
-    get_url: str
-    file_type: Optional[str] = None
-    created_at: Optional[str] = None
-
-
-class ProfileTranscriptResponse(BaseModel):
-    id: str
-    transcript: str
-    original_file_name: Optional[str] = None
-    gpt_explanation: Optional[str] = None
-    get_url: Optional[str] = None
-    created_at: Optional[str] = None
-
-
-class AnkiExportResponse(BaseModel):
-    anki_deck_url: str
-
-
-# --- GPT Template Management --- (collapsed)
-@profile_router.get("/gpt_template", response_model=GptTemplateResponse)
+# --- GPT Template Management ---
+@profile_router.get("/gpt_template",
+                    response_model=GptTemplateResponse)
 async def get_gpt_template(profile_id: str = Depends(ensure_profile_exists)):
     if not profile_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -75,11 +48,13 @@ async def get_gpt_template(profile_id: str = Depends(ensure_profile_exists)):
     if not rec:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="GPT template not found.")
-    return GptTemplateResponse(id=rec.id, sysMsg=rec.sys_msg,
+    return GptTemplateResponse(id=rec.id,
+                               sysMsg=rec.sys_msg,
                                prompt=rec.prompt)
 
 
-@profile_router.post("/gpt_template", response_model=GptTemplateResponse)
+@profile_router.post("/gpt_template",
+                     response_model=GptTemplateResponse)
 async def upsert_gpt_template(template_data: GptTemplateBase,
                               profile_id: str = Depends(ensure_profile_exists)
                               ):

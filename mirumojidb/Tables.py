@@ -1,8 +1,5 @@
-import os
 import uuid
-from databases import Database
-from sqlalchemy import (create_engine,
-                        MetaData,
+from sqlalchemy import (MetaData,
                         Table,
                         Column,
                         String,
@@ -14,14 +11,12 @@ from sqlalchemy import (create_engine,
                         DateTime)
 import datetime
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./mirumoji.db")
-
-database = Database(DATABASE_URL)
-metadata = MetaData()
-
+METADATA = MetaData()
+# ---------------------
+# ---Profiles Table---
 profiles = Table(
     "profiles",
-    metadata,
+    METADATA,
     Column("id",
            String,
            primary_key=True,
@@ -31,10 +26,11 @@ profiles = Table(
            unique=True,
            index=True),
 )
-
+# ----------------------------
+# --- GPT Templates Table ---
 gpt_templates = Table(
     "gpt_templates",
-    metadata,
+    METADATA,
     Column("id",
            String,
            primary_key=True,
@@ -54,10 +50,11 @@ gpt_templates = Table(
     UniqueConstraint("profile_id",
                      name="uq_profile_template")
 )
-
+# ---------------------------------
+# --- Profile Transcripts Table ---
 profile_transcripts = Table(
     "profile_transcripts",
-    metadata,
+    METADATA,
     Column("id",
            String,
            primary_key=True,
@@ -82,13 +79,11 @@ profile_transcripts = Table(
            nullable=True),
     Column("created_at", DateTime, default=datetime.datetime.now())
 )
-
-# Generic table for any file associated with a profile
-# (original uploads, conversions etc.)
-# This can be used to list files under "Fetch Profile's Files"
+# ---------------------------
+# --- Profile Files Table ---
 profile_files = Table(
     "profile_files",
-    metadata,
+    METADATA,
     Column("id",
            String,
            primary_key=True,
@@ -121,10 +116,11 @@ profile_files = Table(
            ForeignKey("profile_transcripts.id"),
            nullable=True),
 )
-
+# -------------------
+# --- Clips Table ---
 clips = Table(
     "clips",
-    metadata,
+    METADATA,
     Column("id",
            String,
            primary_key=True,
@@ -160,18 +156,4 @@ clips = Table(
            DateTime,
            default=datetime.datetime.now()),
 )
-
-engine = create_engine(DATABASE_URL)
-metadata.create_all(engine)
-
-
-async def get_db() -> Database:
-    return database
-
-
-async def connect_db():
-    await database.connect()
-
-
-async def disconnect_db():
-    await database.disconnect()
+# ------------------------------

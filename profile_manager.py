@@ -1,5 +1,6 @@
 from fastapi import Header, HTTPException, Depends, status
-from database import get_db, profiles
+from mirumojidb.db import get_db
+from mirumojidb.Tables import profiles
 import logging
 
 logger = logging.getLogger(__name__)

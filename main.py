@@ -1,11 +1,10 @@
 # main.py
 import logging
-import os
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-
+from pathlib import Path
 from routers.gpt_router import gpt_router
 from routers.audio_router import audio_router
 from routers.health_router import health_router
@@ -13,7 +12,7 @@ from routers.dict_router import dict_router
 from routers.video_router import video_router
 from routers.profile_router import profile_router
 from contextlib import asynccontextmanager
-from database import connect_db, disconnect_db, DATABASE_URL
+from mirumojidb.db import connect_db, disconnect_db, DATABASE_URL
 
 logging.basicConfig(level=logging.INFO,
                     format="%(levelname)8s %(name)s | %(message)s",
@@ -28,9 +27,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
-    os.makedirs("media_files/profiles", exist_ok=True)
-    os.makedirs("media_files/temp", exist_ok=True)
-    logger.info("media_files directories ensured.")
+    media_files = Path("media_files/profiles").resolve()
+    media_files.mkdir(exist_ok=True)
+    media_files_tmp = Path("media_files/temp").resolve()
+    media_files_tmp.mkdir(exist_ok=True)
+    logger.info(f"Storage ensured at: '{media_files.parent}'")
     yield
     await disconnect_db()
 
@@ -41,7 +42,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-app.mount("/media", StaticFiles(directory="media_files"), name="media")
+app.mount("/media",
+          StaticFiles(directory=Path("media_files").resolve()),
+          name="media")
 
 origins = ["http://localhost:5173"]
 
@@ -58,7 +61,8 @@ app.add_middleware(
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content={"success": False, "message": exc.detail},
+        content={"success": False,
+                 "message": exc.detail},
     )
 
 app.include_router(gpt_router)
@@ -70,5 +74,5 @@ app.include_router(profile_router)
 
 
 logger.info(f"Database URL: {DATABASE_URL}")
-logger.info("Application setup complete. Static files served from\
-    './media_files' at '/media'.")
+logger.info("Setup Complete")
+logger.info(f"Serving {Path('media_files').resolve()} at '/media'.")
