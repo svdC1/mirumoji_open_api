@@ -1,124 +1,264 @@
 import logging
-import os
-from fastapi import APIRouter, File, UploadFile, Depends, HTTPException
 import shutil
+import uuid
+from pathlib import Path
+from fastapi import (
+    APIRouter,
+    File,
+    UploadFile,
+    Depends,
+    HTTPException,
+    status,
+)
 
 from profile_manager import ensure_profile_exists
+from mirumojidb.db import get_db
+from mirumojidb.Tables import profile_files
+from processing.audio_processing import AudioTools
+from processing.whisper_wrapper import FWhisperWrapper
 
 logger = logging.getLogger(__name__)
-video_router = APIRouter(prefix='/video')
+video_router = APIRouter(prefix="/video")
 
+BASE_MEDIA_DIR = Path("media_files")
+PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
+TEMP_DIR = BASE_MEDIA_DIR / "temp"
 
-BASE_MEDIA_PATH = "media_files"
-PROFILES_MEDIA_PATH = os.path.join(BASE_MEDIA_PATH, "profiles")
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @video_router.post("/generate_srt")
 async def generate_srt(
     video_file: UploadFile = File(...),
-    profile_id: str = Depends(ensure_profile_exists)
+    profile_id: str = Depends(ensure_profile_exists),
 ):
     if not profile_id:
-        raise HTTPException(status_code=400,
-                            detail="X-Profile-ID header is required.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
 
-    # Create profile-specific directory if it doesn't exist
-    profile_video_path = os.path.join(PROFILES_MEDIA_PATH,
-                                      profile_id, "videos")
-    profile_srt_path = os.path.join(PROFILES_MEDIA_PATH, profile_id, "srts")
-    os.makedirs(profile_video_path, exist_ok=True)
-    os.makedirs(profile_srt_path, exist_ok=True)
+    op_id = str(uuid.uuid4())
+    op_tmp_dir = TEMP_DIR / f"gen_srt_{profile_id}_{op_id}"
+    op_tmp_dir.mkdir(parents=True, exist_ok=True)
 
-    video_file_location = os.path.join(profile_video_path, video_file.filename)
-    srt_file_name = f"{os.path.splitext(video_file.filename)[0]}.srt"
-    srt_file_location = os.path.join(profile_srt_path, srt_file_name)
+    prof_vid_dir = PROFILES_DIR / profile_id / "videos"
+    prof_vid_dir.mkdir(parents=True, exist_ok=True)
+
+    orig_vid_fname = f"{op_id}_{video_file.filename}"
+    final_vid_loc = prof_vid_dir / orig_vid_fname
+    rel_vid_path_db = (
+        Path("profiles") / profile_id / "videos" / orig_vid_fname
+    )
+
+    # Temporary location for the uploaded video within the operation's temp dir
+    tmp_vid_upload_loc = op_tmp_dir / video_file.filename
 
     try:
-        # Save the uploaded video file
-        with open(video_file_location, "wb+") as file_object:
-            shutil.copyfileobj(video_file.file, file_object)
+        # 1. Save uploaded video to operation's temp dir
+        with open(tmp_vid_upload_loc, "wb+") as f_obj:
+            shutil.copyfileobj(video_file.file, f_obj)
+        logger.info(f"Temp video for SRT: {tmp_vid_upload_loc}")
 
-        logger.info(f"Video file saved to {video_file_location}\
-            for profile {profile_id}")
+        # Copy to persistent profile storage
+        shutil.copyfile(tmp_vid_upload_loc, final_vid_loc)
+        logger.info(
+            f"Original video {orig_vid_fname} stored for profile {profile_id}")
 
-        srt_content = """1
-00:00:01,000 --> 00:00:02,000
-Hello
+        # 2. Init AudioTools with operation's temp dir
+        audio_tools = AudioTools(working_dir=op_tmp_dir)
 
-2
-00:00:03,000 --> 00:00:04,000
-World
-"""
+        # 3. Extract audio
+        extracted_audio_fpath = audio_tools.extract_audio(
+            input_path=str(tmp_vid_upload_loc)
+        )
+        if not extracted_audio_fpath or not Path(extracted_audio_fpath
+                                                 ).exists():
+            logger.error(f"Audio extraction failed for {tmp_vid_upload_loc}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to extract audio from video.",
+            )
+        logger.info(f"Audio extracted to {extracted_audio_fpath}")
 
-        # Save the generated SRT file (optional, but good practice)
-        with open(srt_file_location, "w", encoding="utf-8") as srt_file:
-            srt_file.write(srt_content)
-        logger.info(f"SRT file saved to {srt_file_location}\
-            for profile {profile_id}")
+        # 4. Transcribe extracted audio to SRT string
+        fwhisper = FWhisperWrapper()
+        srt_result = fwhisper.transcribe_to_srt(
+            audio_path=str(extracted_audio_fpath),
+            output_path=" ",
+            string_result=True,
+            fix_with_chat_gpt=True,
+        )
 
-        # Here you might want to save metadata to the database:
-        # e.g., original video name, path to video, path to SRT, profile_id
+        if not srt_result:
+            logger.error(
+                f"SRT transcription failed for {extracted_audio_fpath}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to generate SRT from audio.",
+            )
+        srt_content = srt_result
+        logger.info(f"SRT content generated for profile {profile_id}")
+
+        # 5. Save metadata for the original video to profile_files
+        db = await get_db()
+        vid_rec_id = str(uuid.uuid4())
+        ins_vid_query = profile_files.insert().values(
+            id=vid_rec_id,
+            profile_id=profile_id,
+            file_name=video_file.filename,
+            file_path=str(rel_vid_path_db),
+            file_type="original_video_for_srt",
+        )
+        await db.execute(ins_vid_query)
+        logger.info(
+            f"Original video (for SRT) record saved for profile {profile_id}"
+        )
 
         return {"srt_content": srt_content}
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error generating SRT for {video_file.filename}: {e}")
-        raise HTTPException(status_code=500,
-                            detail=f"Failed to generate SRT: {str(e)}")
+        logger.exception(
+            f"Error generating SRT for {video_file.filename},prof {profile_id}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error during SRT generation: {str(e)}",
+        )
+    finally:
+        # 6. Clean up temp operation directory
+        if op_tmp_dir.exists():
+            try:
+                shutil.rmtree(op_tmp_dir)
+                logger.info(f"Cleaned temp dir: {op_tmp_dir}")
+            except OSError as e_os:
+                logger.error(f"Error cleaning temp dir {op_tmp_dir}: {e_os}")
 
 
 @video_router.post("/convert_to_mp4")
 async def convert_to_mp4(
     video_file: UploadFile = File(...),
-    # use_nvenc: bool = Form(False), # Example of an optional parameter
-    profile_id: str = Depends(ensure_profile_exists)
+    profile_id: str = Depends(ensure_profile_exists),
 ):
     if not profile_id:
-        raise HTTPException(status_code=400,
-                            detail="X-Profile-ID header is required.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Profile-ID header is required.",
+        )
 
-    profile_originals_path = os.path.join(PROFILES_MEDIA_PATH,
-                                          profile_id, "originals")
-    profile_converted_path = os.path.join(PROFILES_MEDIA_PATH,
-                                          profile_id, "converted")
-    os.makedirs(profile_originals_path, exist_ok=True)
-    os.makedirs(profile_converted_path, exist_ok=True)
+    use_nvenc = True
 
-    original_file_location = os.path.join(profile_originals_path,
-                                          video_file.filename)
+    op_id = str(uuid.uuid4())
+    op_tmp_dir = TEMP_DIR / f"convert_mp4_{profile_id}_{op_id}"
+    op_tmp_dir.mkdir(parents=True, exist_ok=True)
 
-    base_filename, _ = os.path.splitext(video_file.filename)
-    converted_filename = f"{base_filename}_converted.mp4"
-    converted_file_location = os.path.join(profile_converted_path,
-                                           converted_filename)
+    # Temp location for the initially uploaded file
+    tmp_uploaded_vid_loc = op_tmp_dir / video_file.filename
+
+    # Final storage paths
+    prof_orig_dir = PROFILES_DIR / profile_id / "originals"
+    prof_conv_dir = PROFILES_DIR / profile_id / "converted"
+    prof_orig_dir.mkdir(parents=True, exist_ok=True)
+    prof_conv_dir.mkdir(parents=True, exist_ok=True)
+
+    # Using unique names for stored files
+    orig_stored_fname = f"{op_id}_orig_{video_file.filename}"
+    conv_fname_stem = Path(video_file.filename).stem
+    conv_stored_fname = f"{conv_fname_stem}_{op_id[:8]}_converted.mp4"
+
+    final_orig_stored_loc = prof_orig_dir / orig_stored_fname
+    final_conv_stored_loc = prof_conv_dir / conv_stored_fname
+
+    rel_orig_db_path = (
+        Path("profiles") / profile_id / "originals" / orig_stored_fname
+    )
+    rel_conv_db_path = (
+        Path("profiles") / profile_id / "converted" / conv_stored_fname
+    )
 
     try:
-        # Save the original uploaded video file
-        with open(original_file_location, "wb+") as file_object:
-            shutil.copyfileobj(video_file.file, file_object)
-        logger.info(f"Original video file saved to {original_file_location}\
-            for profile {profile_id}")
+        # 1. Save uploaded video to temp location
+        with open(tmp_uploaded_vid_loc, "wb+") as f_obj:
+            shutil.copyfileobj(video_file.file, f_obj)
+        logger.info(f"Temp video for conversion: {tmp_uploaded_vid_loc}")
 
-        if video_file.filename.lower().endswith(".mp4"):
-            shutil.copyfile(original_file_location, converted_file_location)
-        else:
-            # Create a dummy mp4 file for non-mp4 inputs for now
-            with open(converted_file_location, "w") as f:
-                f.write("dummy mp4 content")
-            logger.warning(f"Non-MP4 file {video_file.filename} received; \
-                dummy MP4 created at {converted_file_location}.")
+        # 2. Init AudioTools
+        audio_tools = AudioTools(working_dir=op_tmp_dir)
 
-        if not os.path.exists(converted_file_location):
-            raise HTTPException(status_code=500,
-                                detail="Video conversion failed.")
+        # 3. Convert video, saving to final converted location
+        conv_path_obj = audio_tools.to_mp4(
+            input_path=str(tmp_uploaded_vid_loc),
+            output_path=str(final_conv_stored_loc),
+            use_nvenc=use_nvenc,
+        )
 
-        logger.info(f"Video file converted and saved to \
-            {converted_file_location} for profile {profile_id}")
+        if not conv_path_obj or not final_conv_stored_loc.exists():
+            logger.error(f"MP4 conversion failed for {tmp_uploaded_vid_loc}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Video conversion to MP4 failed.",
+            )
+        logger.info(f"Video converted to {final_conv_stored_loc}")
 
-        converted_video_url_path = f"/media/profiles/{profile_id}/converted/\
-            {converted_filename}"
+        # 4. Copy original from temp to its final storage
+        shutil.copyfile(tmp_uploaded_vid_loc, final_orig_stored_loc)
+        logger.info(f"Original video copied to {final_orig_stored_loc}")
 
-        return {"converted_video_url": converted_video_url_path}
+        # 5. Save metadata for original and converted files to DB
+        db = await get_db()
+        orig_rec_id = str(uuid.uuid4())
+        conv_rec_id = str(uuid.uuid4())
+
+        ins_orig_q = profile_files.insert().values(
+            id=orig_rec_id,
+            profile_id=profile_id,
+            file_name=video_file.filename,
+            file_path=str(rel_orig_db_path),
+            file_type="original_for_conversion",
+        )
+        await db.execute(ins_orig_q)
+
+        ins_conv_q = profile_files.insert().values(
+            id=conv_rec_id,
+            profile_id=profile_id,
+            file_name=conv_stored_fname,
+            file_path=str(rel_conv_db_path),
+            file_type="converted_video_mp4",
+        )
+        await db.execute(ins_conv_q)
+        logger.info(
+            f"Original&converted video records saved for profile:{profile_id}"
+        )
+
+        # 6. Construct URL for frontend
+        converted_video_url = f"/media/{str(rel_conv_db_path)}"
+
+        return {"converted_video_url": converted_video_url}
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error converting video {video_file.filename}: {e}")
-        raise HTTPException(status_code=500,
-                            detail=f"Failed to convert video: {str(e)}")
+        logger.exception(
+            f"Error converting {video_file.filename} for profile {profile_id}"
+        )
+        # Attempt to clean up partially created files
+        for loc in [final_conv_stored_loc, final_orig_stored_loc]:
+            if loc.exists():
+                try:
+                    loc.unlink()
+                except OSError:
+                    logger.error(f"Could not remove {loc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error during video conversion: {str(e)}",
+        )
+    finally:
+        # 7. Clean up temp operation directory
+        if op_tmp_dir.exists():
+            try:
+                shutil.rmtree(op_tmp_dir)
+                logger.info(f"Cleaned temp dir: {op_tmp_dir}")
+            except OSError as e_os:
+                logger.error(f"Error cleaning temp dir {op_tmp_dir}: {e_os}")
