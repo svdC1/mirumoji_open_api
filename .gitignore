@@ -180,5 +180,5 @@ temp/*
 # IDE
 .vscode/*
 # Database/Media
-mirumojidb.db
+mirumoji.db
 media_files/*
