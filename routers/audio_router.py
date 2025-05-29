@@ -19,8 +19,8 @@ from processing.audio_processing import AudioTools
 from processing.whisper_wrapper import FWhisperWrapper
 from processing.text_processing import GptExplainService
 from profile_manager import ensure_profile_exists
-from mirumojidb.db import get_db
-from mirumojidb.Tables import profile_transcripts, profile_files
+from db.db import get_db
+from db.Tables import profile_transcripts, profile_files
 
 
 logger = logging.getLogger(__name__)

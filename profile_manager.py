@@ -1,22 +1,27 @@
 from fastapi import Header, HTTPException, Depends, status
-from mirumojidb.db import get_db
-from mirumojidb.Tables import profiles
+from db.db import get_db
+from db.Tables import profiles
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
-async def get_profile_id_from_header(
-                        x_profile_id: str = Header(None)) -> str | None:
-    """Simply extracts X-Profile-ID header if present."""
+async def get_profile_id_from_header(x_profile_id: str = Header(None)
+                                     ) -> Optional[str]:
+    """
+    Simply extracts X-Profile-ID header if present.
+    """
     return x_profile_id
 
 
 async def ensure_profile_exists(
     profile_id: str = Depends(get_profile_id_from_header)
 ) -> str:
-    """Ensures a profile exists for the given ID. If ID is None or profile
-    doesn't exist and cannot be created, raises HTTPException."""
+    """
+    Ensures a profile exists for the given ID. If ID is None or profile
+    doesn't exist and cannot be created, raises HTTPException.
+    """
     if not profile_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

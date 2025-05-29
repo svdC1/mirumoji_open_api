@@ -73,11 +73,10 @@ profile_transcripts = Table(
     Column("gpt_explanation",
            Text,
            nullable=True),
-    # Relative path: profiles/<profile_id>/audios/filename
     Column("audio_file_path",
            String,
            nullable=True),
-    Column("created_at", DateTime, default=datetime.datetime.now())
+    Column("created_at", DateTime, default=datetime.datetime.now)
 )
 # ---------------------------
 # --- Profile Files Table ---
@@ -93,24 +92,19 @@ profile_files = Table(
            String,
            ForeignKey("profiles.id", ondelete="CASCADE"),
            nullable=False),
-    # User-facing file name
     Column("file_name",
            String,
            nullable=False),
-    # Relative path from media_files dir,
-    # e.g., profiles/profile_id/videos/my_video.mp4
     Column("file_path",
            String,
            nullable=False,
            unique=True),
-    # e.g., 'original_video', 'converted_video', 'audio_source', 'video_clip'
     Column("file_type",
            String,
            nullable=True),
     Column("created_at",
            DateTime,
-           default=datetime.datetime.now()),
-    # Link to a transcript if this is its source audio/video
+           default=datetime.datetime.now),
     Column("related_transcript_id",
            String,
            ForeignKey("profile_transcripts.id"),
@@ -140,7 +134,6 @@ clips = Table(
     Column("gpt_breakdown_response",
            JSON,
            nullable=False),
-    # Relative path: profiles/<profile_id>/clips/filename.webm
     Column("video_clip_path",
            String,
            nullable=False,
@@ -148,12 +141,11 @@ clips = Table(
     Column("original_video_file_name",
            String,
            nullable=True),
-    # If sourced from a URL
     Column("original_video_url",
            String,
            nullable=True),
     Column("created_at",
            DateTime,
-           default=datetime.datetime.now()),
+           default=datetime.datetime.now),
 )
 # ------------------------------

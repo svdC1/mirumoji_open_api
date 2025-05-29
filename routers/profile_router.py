@@ -3,8 +3,6 @@ import uuid
 import os
 import shutil
 import json
-import random
-import time
 from fastapi import (
     APIRouter, Depends, HTTPException, status,
     File, UploadFile, Form, Path
@@ -16,16 +14,16 @@ from models.ProfileFileResponse import ProfileFileResponse
 from models.ProfileTranscriptResponse import ProfileTranscriptResponse
 from models.AnkiExportResponse import AnkiExportResponse
 from typing import Optional, List
-import genanki
-
-from mirumojidb.db import get_db
-from mirumojidb.Tables import (gpt_templates,
-                               clips,
-                               profile_files,
-                               profile_transcripts
-                               )
+import pathlib
+from db.db import (get_db,
+                   get_gpt_template_db)
+from db.Tables import (gpt_templates,
+                       clips,
+                       profile_files,
+                       profile_transcripts
+                       )
 from profile_manager import ensure_profile_exists
-
+from utils.anki_utils import AnkiExporter
 logger = logging.getLogger(__name__)
 profile_router = APIRouter(prefix='/profiles',
                            dependencies=[Depends(ensure_profile_exists)])
@@ -42,9 +40,7 @@ async def get_gpt_template(profile_id: str = Depends(ensure_profile_exists)):
     if not profile_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required.")
-    db = await get_db()
-    q = gpt_templates.select().where(gpt_templates.c.profile_id == profile_id)
-    rec = await db.fetch_one(q)
+    rec = await get_gpt_template_db(profile_id)
     if not rec:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="GPT template not found.")
@@ -64,8 +60,7 @@ async def upsert_gpt_template(template_data: GptTemplateBase,
     db = await get_db()
     values = {"profile_id": profile_id, "sys_msg": template_data.sys_msg,
               "prompt": template_data.prompt}
-    q = gpt_templates.select().where(gpt_templates.c.profile_id == profile_id)
-    ex = await db.fetch_one(q)
+    ex = await get_gpt_template_db(profile_id)
     if ex:
         await db.execute(
             gpt_templates.update().where(
@@ -340,102 +335,28 @@ async def export_anki_deck(profile_id: str = Depends(ensure_profile_exists)):
     if not profile_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="X-Profile-ID header is required.")
-
     db = await get_db()
     query = clips.select().where(clips.c.profile_id == profile_id).order_by(
-        clips.c.created_at.asc())
-    profile_clips = await db.fetch_all(query)
-
-    if not profile_clips:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="No clips found for this profile to export."
-                            )
-
-    # Create a unique deck ID and name
-    # Deck ID needs to be an integer. Using epoch time + random for uniqueness.
-    deck_id = int(time.time() * 1000) + random.randint(0, 10000)
-    deck_name = f"{profile_id}_Mirumoji_Clips"
-    anki_deck = genanki.Deck(deck_id, deck_name)
-
-    model_id = random.randint(1_000_000_000, 2_000_000_000)
-    anki_model = genanki.Model(
-        model_id,
-        'Mirumoji Clip Model',
-        fields=[
-            {'name': 'Sentence'},
-            {'name': 'FocusWord'},
-            {'name': 'Reading'},
-            {'name': 'Meanings'},
-            {'name': 'Explanation'},
-            {'name': 'Video'},
-            {'name': 'Source'}
-            ],
-        templates=[
-            {
-                'name': 'Clip Card',
-                'qfmt': '{{Sentence}}<br><br>{{Video}}',
-                'afmt': '{{FrontSide}}<hr id="answer"><b>{{FocusWord}}</b>\
-                    [{{Reading}}]<br>{{Meanings}}<br><br><i>Explanation:</i>\
-                        <br>{{Explanation}}<br><br><i>Source: {{Source}}</i>',
-            },
-        ]
-    )
-    anki_deck.add_model(anki_model)
-
-    media_files_to_package = []
-
-    for clip_data in profile_clips:
-        breakdown = clip_data.gpt_breakdown_response
-        sentence_text = breakdown.get("sentence", "")
-        focus_info = breakdown.get("focus", {})
-        focus_word = focus_info.get("word", "N/A")
-        reading = focus_info.get("reading", "")
-        meanings = ", ".join(focus_info.get("meanings", []))
-        gpt_explanation = breakdown.get("gpt_explanation", "")
-
-        video_clip_on_disk = os.path.basename(clip_data.video_clip_path)
-        source_info = clip_data.original_video_file_name or\
-            clip_data.original_video_url or "N/A"
-
-        note_fields = [
-            sentence_text,
-            focus_word,
-            reading,
-            meanings,
-            gpt_explanation,
-            f'[sound:{video_clip_on_disk}]',
-            source_info
-        ]
-        anki_note = genanki.Note(model=anki_model, fields=note_fields)
-        anki_deck.add_note(anki_note)
-
-        # Add full path of the media file to be packaged
-        full_media_path = os.path.join(BASE_MEDIA_PATH,
-                                       clip_data.video_clip_path)
-        if os.path.exists(full_media_path):
-            media_files_to_package.append(full_media_path)
-        else:
-            logger.warning(f"Media file {full_media_path}for clip \
-                {clip_data.id} not found. It will be missing in Anki deck.")
-
-    # Package the deck with media files
-    anki_package = genanki.Package(anki_deck)
-    anki_package.media_files = media_files_to_package
-    # Save the .apkg file to a temporary servable location
-    # Ensure TEMP_MEDIA_PATH (e.g., media_files/temp) is created and servable
-    apkg_filename = f"{profile_id}_anki_deck_{int(time.time())}.apkg"
-    apkg_filepath = os.path.join(TEMP_MEDIA_PATH, apkg_filename)
-    try:
-        anki_package.write_to_file(apkg_filepath)
-        logger.info(f"Anki deck for profile {profile_id}\
-            saved to {apkg_filepath}")
-    except Exception as e:
-        logger.exception(f"Failed to write Anki package\
-            for profile {profile_id}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"Failed to generate Anki deck: {str(e)}")
-
-    # Return the URL to the generated .apkg file
-    # /media is the mount point for StaticFiles(directory="media_files")
-    anki_deck_url = f"/media/temp/{apkg_filename}"
-    return AnkiExportResponse(anki_deck_url=anki_deck_url)
+        clips.c.created_at.desc())
+    clip_lst = [c for c in await db.fetch_all(query)]
+    anki = AnkiExporter()
+    for c in clip_lst:
+        breakdown = json.loads(c.gpt_breakdown_response)
+        explanation = breakdown["gpt_explanation"]
+        sentence = breakdown['sentence']
+        path = str(pathlib.Path(c.video_clip_path).resolve())
+        focus = breakdown["focus"]
+        meanings = ','.join(breakdown['meanings'])
+        anki.add_card(clip_path=path,
+                      word=focus,
+                      meanings=meanings,
+                      sentence=sentence,
+                      explanation=explanation
+                      )
+    outpath = str(
+        pathlib.Path(
+            f"{BASE_MEDIA_PATH}/profiles/{profile_id}/anki/saved_deck.apkg"
+            ).resolve())
+    anki.export(outpath)
+    media_path = f"/media/profiles/{profile_id}/anki/saved_deck.apkg"
+    return AnkiExportResponse(anki_deck_url=media_path)

@@ -1,6 +1,4 @@
 import logging
-import shutil
-import uuid
 from pathlib import Path
 from fastapi import (
     APIRouter,
@@ -10,10 +8,13 @@ from fastapi import (
     HTTPException,
     status,
 )
-
+import asyncio
+import srt
 from profile_manager import ensure_profile_exists
-from mirumojidb.db import get_db
-from mirumojidb.Tables import profile_files
+import shutil
+from db.db import get_db
+from db.Tables import profile_files
+import uuid
 from processing.audio_processing import AudioTools
 from processing.whisper_wrapper import FWhisperWrapper
 
@@ -39,17 +40,14 @@ async def generate_srt(
         )
 
     op_id = str(uuid.uuid4())
-    op_tmp_dir = TEMP_DIR / f"gen_srt_{profile_id}_{op_id}"
+    op_tmp_dir = Path(TEMP_DIR / f"gen_srt_{profile_id}_{op_id}")
+    srt_dir = PROFILES_DIR / profile_id / "subtitles"
+    srt_dir.mkdir(parents=True, exist_ok=True)
+    srt_fp = (srt_dir / f"{op_id}.srt")
+    relative_srt_fp = (
+        Path("profiles") / profile_id / "subtitles" / f"{op_id}.srt"
+        )
     op_tmp_dir.mkdir(parents=True, exist_ok=True)
-
-    prof_vid_dir = PROFILES_DIR / profile_id / "videos"
-    prof_vid_dir.mkdir(parents=True, exist_ok=True)
-
-    orig_vid_fname = f"{op_id}_{video_file.filename}"
-    final_vid_loc = prof_vid_dir / orig_vid_fname
-    rel_vid_path_db = (
-        Path("profiles") / profile_id / "videos" / orig_vid_fname
-    )
 
     # Temporary location for the uploaded video within the operation's temp dir
     tmp_vid_upload_loc = op_tmp_dir / video_file.filename
@@ -59,11 +57,6 @@ async def generate_srt(
         with open(tmp_vid_upload_loc, "wb+") as f_obj:
             shutil.copyfileobj(video_file.file, f_obj)
         logger.info(f"Temp video for SRT: {tmp_vid_upload_loc}")
-
-        # Copy to persistent profile storage
-        shutil.copyfile(tmp_vid_upload_loc, final_vid_loc)
-        logger.info(
-            f"Original video {orig_vid_fname} stored for profile {profile_id}")
 
         # 2. Init AudioTools with operation's temp dir
         audio_tools = AudioTools(working_dir=op_tmp_dir)
@@ -83,7 +76,8 @@ async def generate_srt(
 
         # 4. Transcribe extracted audio to SRT string
         fwhisper = FWhisperWrapper()
-        srt_result = fwhisper.transcribe_to_srt(
+        srt_result = await asyncio.to_thread(
+            fwhisper.transcribe_to_srt,
             audio_path=str(extracted_audio_fpath),
             output_path=" ",
             string_result=True,
@@ -97,25 +91,26 @@ async def generate_srt(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to generate SRT from audio.",
             )
-        srt_content = srt_result
+        with open(srt_fp, "w", encoding="utf-8") as f:
+            f.write(srt.compose(srt_result))
         logger.info(f"SRT content generated for profile {profile_id}")
 
-        # 5. Save metadata for the original video to profile_files
+        # 5. Save metadata
         db = await get_db()
         vid_rec_id = str(uuid.uuid4())
         ins_vid_query = profile_files.insert().values(
             id=vid_rec_id,
             profile_id=profile_id,
-            file_name=video_file.filename,
-            file_path=str(rel_vid_path_db),
-            file_type="original_video_for_srt",
+            file_name=srt_fp.name,
+            file_path=str(relative_srt_fp),
+            file_type="srt",
         )
         await db.execute(ins_vid_query)
         logger.info(
-            f"Original video (for SRT) record saved for profile {profile_id}"
+            f"SRT record saved for profile {profile_id}"
         )
 
-        return {"srt_content": srt_content}
+        return {"srt_content": srt_result}
 
     except HTTPException:
         raise
@@ -158,24 +153,17 @@ async def convert_to_mp4(
     tmp_uploaded_vid_loc = op_tmp_dir / video_file.filename
 
     # Final storage paths
-    prof_orig_dir = PROFILES_DIR / profile_id / "originals"
     prof_conv_dir = PROFILES_DIR / profile_id / "converted"
-    prof_orig_dir.mkdir(parents=True, exist_ok=True)
     prof_conv_dir.mkdir(parents=True, exist_ok=True)
 
     # Using unique names for stored files
-    orig_stored_fname = f"{op_id}_orig_{video_file.filename}"
     conv_fname_stem = Path(video_file.filename).stem
     conv_stored_fname = f"{conv_fname_stem}_{op_id[:8]}_converted.mp4"
 
-    final_orig_stored_loc = prof_orig_dir / orig_stored_fname
     final_conv_stored_loc = prof_conv_dir / conv_stored_fname
 
-    rel_orig_db_path = (
-        Path("profiles") / profile_id / "originals" / orig_stored_fname
-    )
     rel_conv_db_path = (
-        Path("profiles") / profile_id / "converted" / conv_stored_fname
+       Path("profiles") / profile_id / "converted" / conv_stored_fname
     )
 
     try:
@@ -202,34 +190,20 @@ async def convert_to_mp4(
             )
         logger.info(f"Video converted to {final_conv_stored_loc}")
 
-        # 4. Copy original from temp to its final storage
-        shutil.copyfile(tmp_uploaded_vid_loc, final_orig_stored_loc)
-        logger.info(f"Original video copied to {final_orig_stored_loc}")
-
-        # 5. Save metadata for original and converted files to DB
+        # 5. Save metadata for converted files to DB
         db = await get_db()
-        orig_rec_id = str(uuid.uuid4())
         conv_rec_id = str(uuid.uuid4())
-
-        ins_orig_q = profile_files.insert().values(
-            id=orig_rec_id,
-            profile_id=profile_id,
-            file_name=video_file.filename,
-            file_path=str(rel_orig_db_path),
-            file_type="original_for_conversion",
-        )
-        await db.execute(ins_orig_q)
 
         ins_conv_q = profile_files.insert().values(
             id=conv_rec_id,
             profile_id=profile_id,
             file_name=conv_stored_fname,
             file_path=str(rel_conv_db_path),
-            file_type="converted_video_mp4",
+            file_type="mp4",
         )
         await db.execute(ins_conv_q)
         logger.info(
-            f"Original&converted video records saved for profile:{profile_id}"
+            f"Converted video records saved for profile:{profile_id}"
         )
 
         # 6. Construct URL for frontend
@@ -244,7 +218,7 @@ async def convert_to_mp4(
             f"Error converting {video_file.filename} for profile {profile_id}"
         )
         # Attempt to clean up partially created files
-        for loc in [final_conv_stored_loc, final_orig_stored_loc]:
+        for loc in [final_conv_stored_loc]:
             if loc.exists():
                 try:
                     loc.unlink()

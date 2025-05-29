@@ -12,7 +12,7 @@ from routers.dict_router import dict_router
 from routers.video_router import video_router
 from routers.profile_router import profile_router
 from contextlib import asynccontextmanager
-from mirumojidb.db import connect_db, disconnect_db, DATABASE_URL
+from db.db import connect_db, disconnect_db, DATABASE_URL
 
 logging.basicConfig(level=logging.INFO,
                     format="%(levelname)8s %(name)s | %(message)s",
