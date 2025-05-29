@@ -46,7 +46,7 @@ app.mount("/media",
           StaticFiles(directory=Path("media_files").resolve()),
           name="media")
 
-origins = ["http://localhost:5173"]
+origins = ["http://localhost:5173", "http://localhost:4173"]
 
 app.add_middleware(
     CORSMiddleware,

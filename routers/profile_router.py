@@ -341,22 +341,22 @@ async def export_anki_deck(profile_id: str = Depends(ensure_profile_exists)):
     clip_lst = [c for c in await db.fetch_all(query)]
     anki = AnkiExporter()
     for c in clip_lst:
-        breakdown = json.loads(c.gpt_breakdown_response)
+        breakdown = c.gpt_breakdown_response
         explanation = breakdown["gpt_explanation"]
         sentence = breakdown['sentence']
-        path = str(pathlib.Path(c.video_clip_path).resolve())
-        focus = breakdown["focus"]
-        meanings = ','.join(breakdown['meanings'])
+        path = str(pathlib.Path(BASE_MEDIA_PATH) / c.video_clip_path)
+        focus = breakdown["focus"]['word']
+        meanings = ','.join(breakdown['focus']['meanings'])
         anki.add_card(clip_path=path,
                       word=focus,
                       meanings=meanings,
                       sentence=sentence,
                       explanation=explanation
                       )
-    outpath = str(
-        pathlib.Path(
-            f"{BASE_MEDIA_PATH}/profiles/{profile_id}/anki/saved_deck.apkg"
-            ).resolve())
+    anki_dir = pathlib.Path(TEMP_MEDIA_PATH) / 'profiles' / profile_id / 'anki'
+    anki_dir.mkdir(parents=True, exist_ok=True)
+    pkg_fn = f"{uuid.uuid4()}_saved_deck.apkg"
+    outpath = anki_dir / pkg_fn
     anki.export(outpath)
-    media_path = f"/media/profiles/{profile_id}/anki/saved_deck.apkg"
+    media_path = f"/media/temp/profiles/{profile_id}/anki/{pkg_fn}"
     return AnkiExportResponse(anki_deck_url=media_path)

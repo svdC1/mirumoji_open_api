@@ -19,7 +19,7 @@ from processing.whisper_wrapper import FWhisperWrapper
 
 logger = logging.getLogger(__name__)
 video_router = APIRouter(prefix="/video")
-
+fwhisper = FWhisperWrapper()
 BASE_MEDIA_DIR = Path("media_files")
 PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
 TEMP_DIR = BASE_MEDIA_DIR / "temp"
@@ -74,14 +74,13 @@ async def generate_srt(
         logger.info(f"Audio extracted to {extracted_audio_fpath}")
 
         # 4. Transcribe extracted audio to SRT string
-        fwhisper = FWhisperWrapper()
         srt_result = await asyncio.to_thread(
-            fwhisper.transcribe_to_srt,
-            audio_path=str(extracted_audio_fpath),
-            output_path=" ",
-            string_result=True,
-            fix_with_chat_gpt=True,
-        )
+                fwhisper.transcribe_to_srt,
+                audio_path=str(extracted_audio_fpath),
+                output_path=" ",
+                string_result=True,
+                fix_with_chat_gpt=True,
+                )
 
         if not srt_result:
             logger.error(
