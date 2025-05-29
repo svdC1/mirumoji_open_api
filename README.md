@@ -21,7 +21,7 @@ Before you begin, ensure you have the following installed on your system:
 
 ## Setup Instructions
 
-1.  **Download [`docker-compose.yaml`](https://github.com/svdC1/mirumoji_open_front/docker-compose.yaml):**
+1.  **Download [`docker-compose.yaml`](https://github.com/svdC1/mirumoji_open_front/blob/main/docker-compose.yaml):**
 
     -   Download the `docker-compose.yaml` file from this GitHub release and place it in a new, empty directory on your computer (e.g., `my-app-local`).
 
