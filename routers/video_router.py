@@ -9,7 +9,6 @@ from fastapi import (
     status,
 )
 import asyncio
-import srt
 from profile_manager import ensure_profile_exists
 import shutil
 from db.db import get_db
@@ -92,7 +91,7 @@ async def generate_srt(
                 detail="Failed to generate SRT from audio.",
             )
         with open(srt_fp, "w", encoding="utf-8") as f:
-            f.write(srt.compose(srt_result))
+            f.write(srt_result)
         logger.info(f"SRT content generated for profile {profile_id}")
 
         # 5. Save metadata
