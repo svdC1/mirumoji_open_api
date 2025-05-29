@@ -9,7 +9,6 @@ on:
         paths-ignore:
             - ".github/**"
             - "README.md"
-            - "modal_function/**"
 
     # Run manually
     workflow_dispatch:
@@ -49,9 +48,6 @@ jobs:
               with:
                   # Define the image name structure. Uses ghcr.io/<owner>/<repo>
                   images: ghcr.io/${{ github.repository }}
-                  # Generate tags:
-                  # - 'latest' for the default branch
-                  # - Git SHA for every push
                   tags: |
                       type=sha,prefix=
                       type=raw,value=latest,enable={{is_default_branch}}
@@ -74,5 +70,4 @@ jobs:
                   push: true
                   tags: ${{ steps.meta.outputs.tags }} # Use tags generated in the previous step
                   labels: ${{ steps.meta.outputs.labels }} # Use labels generated in the previous step
-                  cache-from: type=gha # Enable GitHub Actions cache for faster builds
                   cache-to: type=gha,mode=max
