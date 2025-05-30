@@ -70,4 +70,3 @@ jobs:
                   push: true
                   tags: ${{ steps.meta.outputs.tags }} # Use tags generated in the previous step
                   labels: ${{ steps.meta.outputs.labels }} # Use labels generated in the previous step
-                  cache-to: type=gha,mode=max
