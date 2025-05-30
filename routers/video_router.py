@@ -16,6 +16,8 @@ from db.Tables import profile_files
 import uuid
 from processing.audio_processing import AudioTools
 from processing.whisper_wrapper import FWhisperWrapper
+from processing.Processor import Processor
+
 
 logger = logging.getLogger(__name__)
 video_router = APIRouter(prefix="/video")
@@ -23,7 +25,8 @@ fwhisper = FWhisperWrapper()
 BASE_MEDIA_DIR = Path("media_files")
 PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
 TEMP_DIR = BASE_MEDIA_DIR / "temp"
-
+processor = Processor(save_path=BASE_MEDIA_DIR,
+                      use_modal=True)
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -74,12 +77,11 @@ async def generate_srt(
         logger.info(f"Audio extracted to {extracted_audio_fpath}")
 
         # 4. Transcribe extracted audio to SRT string
+        parts = Path(extracted_audio_fpath).parts
+        extracted_audio_fpath = Path(*parts[-4:])
         srt_result = await asyncio.to_thread(
-                fwhisper.transcribe_to_srt,
-                audio_path=str(extracted_audio_fpath),
-                output_path=" ",
-                string_result=True,
-                fix_with_chat_gpt=True,
+                processor.modal_transcribe_to_srt,
+                media_fp=str(extracted_audio_fpath),
                 )
 
         if not srt_result:
@@ -141,8 +143,6 @@ async def convert_to_mp4(
             detail="X-Profile-ID header is required.",
         )
 
-    use_nvenc = True
-
     op_id = str(uuid.uuid4())
     op_tmp_dir = TEMP_DIR / f"convert_mp4_{profile_id}_{op_id}"
     op_tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -170,14 +170,10 @@ async def convert_to_mp4(
             shutil.copyfileobj(video_file.file, f_obj)
         logger.info(f"Temp video for conversion: {tmp_uploaded_vid_loc}")
 
-        # 2. Init AudioTools
-        audio_tools = AudioTools(working_dir=op_tmp_dir)
-
         # 3. Convert video, saving to final converted location
-        conv_path_obj = audio_tools.to_mp4(
-            input_path=str(tmp_uploaded_vid_loc),
-            output_path=str(final_conv_stored_loc),
-            use_nvenc=use_nvenc,
+        conv_path_obj = await processor.modal_convert_to_mp4(
+            video_fp=str(tmp_uploaded_vid_loc),
+            outpath=str(final_conv_stored_loc)
         )
 
         if not conv_path_obj or not final_conv_stored_loc.exists():

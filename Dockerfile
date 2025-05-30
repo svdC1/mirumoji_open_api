@@ -1,61 +1,44 @@
-# Use the NVIDIA CUDA runtime image as the base for GPU support
-FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
+FROM python:3.11-slim-bookworm
 
-# Set environment variables
+# Set working directory
+WORKDIR /app
+
+# Set env
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    PATH="/usr/local/bin:${PATH}" \
-    PIP_NO_CACHE_DIR=1
+    PATH="/usr/local/bin:${PATH}"
 
-# Install system dependencies from both Dockerfiles
-# Includes build-essential for some python packages, git, ffmpeg, mecab
+# --- Install System Dependencies ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    git \
-    ffmpeg \
-    wget xz-utils \
+    wget xz-utils git \
     mecab libmecab-dev mecab-ipadic-utf8 \
-    python3.11 python3.11-dev python3.11-venv python3-pip \
-    python-is-python3 \
-    && rm -rf /var/lib/apt/lists/*
+    ffmpeg
+# --- Upgrade PIP ---
+RUN python3.11 -m ensurepip --upgrade && \
+    python3.11 -m pip install --no-cache-dir --upgrade pip
 
-# Upgrade pip (using the python from the base image)
-RUN python -m pip install --upgrade pip
+# --- Install PyTorch CPU ---
+RUN python3.11 -m pip install --no-cache-dir \
+    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+    --index-url https://download.pytorch.org/whl/cpu
 
-# Install PyTorch with CUDA support
-# Specify index URL for CUDA 12.1 compatible wheels, suitable for CUDA 12.3 base image.
-RUN python -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
-
-# Install Helpers
-
-RUN python -m pip install huggingface_hub \
-    requests sentencepiece
-
-# Download jamdict.db
+# --- Download jamdict.db ---
 RUN mkdir -p /root/.jamdict/data && \
     wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1QZRzOoMF4CGlkdl0FyU7ledAZLRlpoom' \
     -O /tmp/jamdict.db.xz && \
     unxz /tmp/jamdict.db.xz && \
     mv /tmp/jamdict.db /root/.jamdict/data/jamdict.db
 
-# Set working directory
-WORKDIR /app
-
-# Copy requirements.txt and install all dependencies
+# --- Install Python Packages ---
 COPY requirements.txt .
-RUN python -m pip install -r requirements.txt
+RUN python3.11 -m pip install --no-cache-dir -r requirements.txt
 
-# Download UniDic Dictionary
-RUN python -m unidic download
+# --- Download UniDic Dictionary ---
+RUN python3.11 -m unidic download
 
-# Pre-cache the Faster-Whisper model (from modal Dockerfile)
-RUN python -c "from huggingface_hub import snapshot_download; \
-    snapshot_download('Systran/faster-whisper-large-v3', local_dir_use_symlinks=False)"
-
-# Copy the rest of the application code
+# Copy your actual app code
 COPY . .
 
-# Expose the port the app runs on
+# --- Expose and run ---
 EXPOSE 8000
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python3.11", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
