@@ -13,11 +13,9 @@ logger = logging.getLogger(__name__)
 # --- Modal Setup ---
 script_dir = Path(__file__).resolve().parent
 project_root_dir = script_dir.parent
-dockerfile_path = script_dir / "Dockerfile.modal"
 
-mirumoji_image = modal.Image.from_dockerfile(
-    path=str(dockerfile_path),
-    context_dir=project_root_dir,
+mirumoji_image = modal.Image.from_registry(
+    "docker.io/svdc1/mirumoji-modal-gpu:latest"
 )
 mirumoji_image.add_local_dir(project_root_dir,
                              remote_path="/app")
