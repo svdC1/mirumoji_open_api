@@ -17,12 +17,13 @@ media_files_path = project_root_dir / "media_files"
 media_files_path.mkdir(parents=True,
                        exist_ok=True)
 
+# Build media_files on modal container startup
 mirumoji_image = modal.Image.from_registry(
     "docker.io/svdc1/mirumoji-modal-gpu:latest"
-)
-# Build media_files on modal container startup
-mirumoji_image.add_local_dir(media_files_path,
-                             remote_path="/app/media_files")
+).add_local_dir(media_files_path,
+                remote_path="/root/media_files")
+
+logger.info(f"Media Path: {media_files_path}")
 
 app = modal.App(
     "mirumoji-gpu",

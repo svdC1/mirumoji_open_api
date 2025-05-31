@@ -189,8 +189,7 @@ async def convert_to_mp4(
         # 3. Convert video, saving to final converted location
         # If MODAL env variables are available use MODAL
         if USING_MODAL:
-            conv_path_obj = await asyncio.to_thread(
-                processor.modal_convert_to_mp4,
+            conv_path_obj = await processor.modal_convert_to_mp4(
                 video_fp=str(tmp_uploaded_vid_loc),
                 outpath=str(final_conv_stored_loc)
             )
