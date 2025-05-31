@@ -16,12 +16,18 @@ from fastapi import (
 
 # Project-specific modules
 from processing.audio_processing import AudioTools
-from processing.whisper_wrapper import FWhisperWrapper
 from processing.text_processing import GptExplainService
 from profile_manager import ensure_profile_exists
 from db.db import get_db
 from db.Tables import profile_transcripts, profile_files
+from processing.Processor import Processor
+from utils.env_utils import using_modal
+import asyncio
+USING_MODAL = using_modal()
 
+if not USING_MODAL:
+    from processing.whisper_wrapper import FWhisperWrapper
+    fwhisper = FWhisperWrapper()
 
 logger = logging.getLogger(__name__)
 audio_router = APIRouter(prefix="/audio")
@@ -29,8 +35,9 @@ audio_router = APIRouter(prefix="/audio")
 BASE_MEDIA_DIR = Path("media_files")
 PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
 TEMP_DIR = BASE_MEDIA_DIR / "temp"
-
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
+if USING_MODAL:
+    processor = Processor(save_path=TEMP_DIR, use_modal=True)
 
 
 @audio_router.post("/transcribe_from_audio")
@@ -95,14 +102,18 @@ async def transcribe_from_audio(
             f"Audio ({'cleaned' if do_clean_audio else 'original'}) "
             f"copied to persistent: {final_audio_storage_loc}"
         )
-
-        # 4. Use FWhisperWrapper.transcribe_to_str()
-        fwhisper = FWhisperWrapper()
-        # transcribe_kwargs can be passed if needed, e.g., {'language': 'ja'}
-        transcription_data = fwhisper.transcribe_to_str(
-            audio_path=str(final_audio_storage_loc)
-        )
-
+        # When MODAL env variables are available use MODAL
+        if USING_MODAL:
+            transcription_data = await asyncio.to_thread(
+                processor.modal_transcribe_to_str,
+                audio_fp=str(final_audio_storage_loc)
+            )
+        # Run locally
+        else:
+            transcription_data = await asyncio.to_thread(
+                fwhisper.transcribe_to_str,
+                audio_path=str(final_audio_storage_loc)
+            )
         if not transcription_data or "text" not in transcription_data:
             logger.error(
                 f"Transcription (to_str) failed or gave invalid\

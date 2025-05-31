@@ -207,6 +207,24 @@ class AudioTools:
             f"scale=w={w}:h={h}:force_original_aspect_ratio=decrease,"
             f"pad=w={w}:h={h}:x=(ow-iw)/2:y=(oh-ih)/2:color=black"
         )
+        cpu_enc = [
+                "-c:v", "libx264",
+                "-profile:v", "high",
+                "-b:v", target_bitrate,
+                "-preset", "veryfast",
+                "-crf", "23",
+                "-pix_fmt", "yuv420p",
+            ]
+        cpu_cmd = [
+            self.ffmpeg, "-y",
+            "-i", src.as_posix(),
+            "-vf", vf,
+            *cpu_enc,
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            dst.as_posix(),
+        ]
 
         # ---------- choose encoder ----------
         if use_nvenc:
@@ -218,14 +236,7 @@ class AudioTools:
                 "-pix_fmt", "yuv420p",
             ]
         else:
-            enc_args = [
-                "-c:v", "libx264",
-                "-profile:v", "high",
-                "-b:v", target_bitrate,
-                "-preset", "veryfast",
-                "-crf", "23",
-                "-pix_fmt", "yuv420p",
-            ]
+            enc_args = cpu_enc
 
         cmd = [
             self.ffmpeg, "-y",
@@ -239,6 +250,11 @@ class AudioTools:
         ]
 
         result = self.run_command(cmd, capture_output=True, hide_and_log=True)
+        # Retry with normal args in case of NVENC error
+        if result.returncode != 0 and use_nvenc:
+            result = self.run_command(cpu_cmd,
+                                      capture_output=True,
+                                      hide_and_log=True)
         if result is None or result.returncode != 0:
             self.logger.error("FFmpeg to_mp4 failed:\n%s", result.stderr)
             return None

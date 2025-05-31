@@ -28,3 +28,11 @@ def check_env(expected: List,
                 raise ValueError(f"Could not find variable: {m}")
             API_KEYS[m] = input[m]
     return API_KEYS
+
+
+def using_modal() -> bool:
+    load_dotenv()
+    keys = ["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"]
+    if keys[0] in os.environ and keys[1] in os.environ:
+        return True
+    return False
