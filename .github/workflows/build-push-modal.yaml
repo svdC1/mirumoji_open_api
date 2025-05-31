@@ -51,7 +51,7 @@ jobs:
                   cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
                   # Add estargz compression so Modal pulls faster
                   outputs: |
-                      type=registry,
-                      compression=estargz,
-                      oci-mediatype=true,
+                      type=registry
+                      compression=estargz
+                      oci-mediatype=true
                       force-compression=true
