@@ -14,14 +14,17 @@ import shutil
 from db.db import get_db
 from db.Tables import profile_files
 import uuid
+from utils.env_utils import using_modal
 from processing.audio_processing import AudioTools
-from processing.whisper_wrapper import FWhisperWrapper
 from processing.Processor import Processor
+USING_MODAL = using_modal()
+if not USING_MODAL:
+    from processing.whisper_wrapper import FWhisperWrapper
+    fwhisper = FWhisperWrapper()
 
 
 logger = logging.getLogger(__name__)
 video_router = APIRouter(prefix="/video")
-fwhisper = FWhisperWrapper()
 BASE_MEDIA_DIR = Path("media_files")
 PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
 TEMP_DIR = BASE_MEDIA_DIR / "temp"
@@ -77,12 +80,24 @@ async def generate_srt(
         logger.info(f"Audio extracted to {extracted_audio_fpath}")
 
         # 4. Transcribe extracted audio to SRT string
-        parts = Path(extracted_audio_fpath).parts
-        extracted_audio_fpath = Path(*parts[-4:])
-        srt_result = await asyncio.to_thread(
-                processor.modal_transcribe_to_srt,
-                media_fp=str(extracted_audio_fpath),
-                )
+        # If Modal env variables are available use MODAL
+        if USING_MODAL:
+            # Fix path for Internal Mounted Modal Container
+            parts = Path(extracted_audio_fpath).parts
+            extracted_audio_fpath = Path(*parts[-4:])
+            srt_result = await asyncio.to_thread(
+                    processor.modal_transcribe_to_srt,
+                    media_fp=str(extracted_audio_fpath),
+                    )
+        # Run locally
+        else:
+            srt_result = await asyncio.to_thread(
+                fwhisper.transcribe_to_srt,
+                audio_path=str(extracted_audio_fpath),
+                output_path=" ",
+                string_result=True,
+                fix_with_chat_gpt=True
+            )
 
         if not srt_result:
             logger.error(
@@ -171,10 +186,22 @@ async def convert_to_mp4(
         logger.info(f"Temp video for conversion: {tmp_uploaded_vid_loc}")
 
         # 3. Convert video, saving to final converted location
-        conv_path_obj = await processor.modal_convert_to_mp4(
-            video_fp=str(tmp_uploaded_vid_loc),
-            outpath=str(final_conv_stored_loc)
-        )
+        # If MODAL env variables are available use MODAL
+        if USING_MODAL:
+            conv_path_obj = await asyncio.to_thread(
+                processor.modal_convert_to_mp4,
+                video_fp=str(tmp_uploaded_vid_loc),
+                outpath=str(final_conv_stored_loc)
+            )
+        # Run Locally
+        else:
+            audio_tools = AudioTools(working_dir=op_tmp_dir)
+            conv_path_obj = await asyncio.to_thread(
+                audio_tools.to_mp4,
+                input_path=str(tmp_uploaded_vid_loc),
+                output_path=str(final_conv_stored_loc),
+                use_nvenc=True
+            )
 
         if not conv_path_obj or not final_conv_stored_loc.exists():
             logger.error(f"MP4 conversion failed for {tmp_uploaded_vid_loc}")
