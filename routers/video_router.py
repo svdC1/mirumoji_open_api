@@ -28,8 +28,9 @@ video_router = APIRouter(prefix="/video")
 BASE_MEDIA_DIR = Path("media_files")
 PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
 TEMP_DIR = BASE_MEDIA_DIR / "temp"
-processor = Processor(save_path=BASE_MEDIA_DIR,
-                      use_modal=True)
+if USING_MODAL:
+    processor = Processor(save_path=BASE_MEDIA_DIR,
+                          use_modal=True)
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 

@@ -36,7 +36,7 @@ BASE_MEDIA_DIR = Path("media_files")
 PROFILES_DIR = BASE_MEDIA_DIR / "profiles"
 TEMP_DIR = BASE_MEDIA_DIR / "temp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
-if using_modal:
+if USING_MODAL:
     processor = Processor(save_path=TEMP_DIR, use_modal=True)
 
 
