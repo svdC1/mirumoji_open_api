@@ -4,8 +4,9 @@ FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PATH="/usr/local/bin:${PATH}" \
-    PIP_NO_CACHE_DIR=1\
-    PYTHONPATH="/app:${PYTHONPATH}"
+    PIP_NO_CACHE_DIR=1
+
+ENV PYTHONPATH="/app:${PYTHONPATH}"
 
 # ── System deps & Python shim ────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
