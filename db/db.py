@@ -8,7 +8,7 @@ from pathlib import Path
 # Check if Data Folder exists
 project_root = Path(__file__).resolve().parent.parent
 path_data = project_root / "data"
-path_data.mkdir(prents=True, exist_ok=True)
+path_data.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/mirumoji.db")
 database = Database(DATABASE_URL)
 METADATA = METADATA
