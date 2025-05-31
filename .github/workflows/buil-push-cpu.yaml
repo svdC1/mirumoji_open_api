@@ -1,4 +1,4 @@
-name: Build and Push Docker Image for RunPod
+name: Build and Push CPU Docker Image
 
 # Controls when the workflow will run
 on:
