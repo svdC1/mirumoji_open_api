@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Query, HTTPException
 import logging
 from processing.Processor import Processor
+from utils.env_utils import using_modal
 
+USING_MODAL = using_modal()
 logger = logging.getLogger(__name__)
 dict_router = APIRouter(prefix="/dict")
-processor = Processor()
+processor = Processor(use_modal=USING_MODAL)
 breakdown_service = processor.sentence_breakdown_service
 
 

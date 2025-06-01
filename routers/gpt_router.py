@@ -17,10 +17,12 @@ from models.BreakdownResponse import BreakdownResponse
 from models.CustomBreakdownRequest import CustomBreakdownRequest
 from utils.stream_utils import sse_gen
 from profile_manager import get_profile_id_optional
+from utils.env_utils import using_modal
 
+USING_MODAL = using_modal()
 logger = logging.getLogger(__name__)
 
-processor = Processor()
+processor = Processor(use_modal=USING_MODAL)
 breakdown_service = processor.sentence_breakdown_service
 
 gpt_router = APIRouter(prefix='/gpt')
