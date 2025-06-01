@@ -58,17 +58,18 @@ class Processor:
         else:
             self.audio_tools = AudioTools(self.save_path)
         if use_modal:
-            from processing.whisper_wrapper import FWhisperWrapper
             from modal_processing.ModalApp import (app,
                                                    transcribe_srt_job,
                                                    transcribe_to_string_job,
                                                    video_conversion_job
                                                    )
-            self.fwhisper = FWhisperWrapper(**whisper_kwargs)
             self.modal_app = app
             self.transcribe_srt_job = transcribe_srt_job
             self.transcribe_to_string_job = transcribe_to_string_job
             self.video_conversion_job = video_conversion_job
+        else:
+            from processing.whisper_wrapper import FWhisperWrapper
+            self.fwhisper = FWhisperWrapper(**whisper_kwargs)
         # Save attrs
         self.save_path_input = save_path
         self.use_modal = use_modal
