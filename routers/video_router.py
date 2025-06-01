@@ -86,8 +86,7 @@ async def generate_srt(
             # Fix path for Internal Mounted Modal Container
             parts = Path(extracted_audio_fpath).parts
             extracted_audio_fpath = Path(*parts[-4:])
-            srt_result = await asyncio.to_thread(
-                    processor.modal_transcribe_to_srt,
+            srt_result = await processor.modal_transcribe_to_srt(
                     media_fp=str(extracted_audio_fpath),
                     )
         # Run locally

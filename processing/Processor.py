@@ -103,18 +103,18 @@ class Processor:
         if isinstance(self.save_path, TemporaryDirectory):
             self.save_path.cleanup()
 
-    def modal_transcribe_to_srt(self,
-                                media_fp: Union[str, Path]
-                                ) -> Union[str, None]:
+    async def modal_transcribe_to_srt(self,
+                                      media_fp: Union[str, Path]
+                                      ) -> Union[str, None]:
         with self.modal_app.run():
             media_fp = Path(media_fp).as_posix()
             return self.transcribe_srt_job.remote(
                 OPENAI_API_KEY=self.API_KEYS["OPENAI_API_KEY"],
                 media_fp=media_fp)
 
-    def modal_transcribe_to_str(self,
-                                audio_fp: Union[str, Path]
-                                ) -> Union[str, None]:
+    async def modal_transcribe_to_str(self,
+                                      audio_fp: Union[str, Path]
+                                      ) -> Union[str, None]:
         with self.modal_app.run():
             audio_fp = Path(audio_fp).as_posix()
             return self.transcribe_to_string_job.remote(audio_fp=audio_fp)

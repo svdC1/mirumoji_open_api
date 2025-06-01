@@ -104,8 +104,7 @@ async def transcribe_from_audio(
         )
         # When MODAL env variables are available use MODAL
         if USING_MODAL:
-            transcription_data = await asyncio.to_thread(
-                processor.modal_transcribe_to_str,
+            transcription_data = await processor.modal_transcribe_to_str(
                 audio_fp=str(final_audio_storage_loc)
             )
         # Run locally
