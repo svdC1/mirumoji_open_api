@@ -46,6 +46,4 @@ jobs:
                   file: ./modal_processing/Dockerfile.modal
                   platforms: linux/amd64
                   tags: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
-                  # Add estargz compression so Modal pulls faster
-                  outputs: |
-                      type=registry,compression=estargz,oci-mediatypes=true,force-compression=true
+                  outputs: type=registry
