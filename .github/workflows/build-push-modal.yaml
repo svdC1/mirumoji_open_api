@@ -49,7 +49,4 @@ jobs:
                   tags: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
                   # Add estargz compression so Modal pulls faster
                   outputs: |
-                      type=registry
-                      compression=estargz
-                      oci-mediatype=true
-                      force-compression=true
+                      type=registry,compression=estargz,oci-mediatype=true,force-compression=true
