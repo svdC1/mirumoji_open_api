@@ -5,9 +5,11 @@ from processing.whisper_wrapper import FWhisperWrapper
 from processing.audio_processing import AudioTools
 from pathlib import Path
 from dotenv import load_dotenv
+import tempfile
+import functools
+
 load_dotenv()
 logger = logging.getLogger(__name__)
-
 
 # --- Modal Setup ---
 script_dir = Path(__file__).resolve().parent
@@ -15,6 +17,12 @@ project_root_dir = script_dir.parent
 media_files_path = project_root_dir / "media_files"
 media_files_path.mkdir(parents=True,
                        exist_ok=True)
+
+# Increase Temp File For Modal
+tempfile.SpooledTemporaryFile = functools.partial(
+    tempfile.SpooledTemporaryFile,
+    max_size=2_000_000_000
+)
 
 # Build media_files on modal container startup
 mirumoji_image = modal.Image.from_registry(
