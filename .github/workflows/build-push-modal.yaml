@@ -44,7 +44,6 @@ jobs:
               with:
                   context: .
                   file: ./modal_processing/Dockerfile.modal
-                  push: true
                   platforms: linux/amd64
                   tags: ${{ env.REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
                   # Add estargz compression so Modal pulls faster
