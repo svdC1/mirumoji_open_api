@@ -83,14 +83,20 @@ async def generate_srt(
         # 4. Transcribe extracted audio to SRT string
         # If Modal env variables are available use MODAL
         if USING_MODAL:
+            logger.info("Conversion sent to Modal")
+            logger.info(f"Local Filepath: {extracted_audio_fpath}")
             # Fix path for Internal Mounted Modal Container
             parts = Path(extracted_audio_fpath).parts
             extracted_audio_fpath = Path(*parts[-4:])
+            logger.info(
+                f"Media Filepath Adapted for Modal: {extracted_audio_fpath}")
             srt_result = await processor.modal_transcribe_to_srt(
                     media_fp=str(extracted_audio_fpath),
                     )
         # Run locally
         else:
+            logger.info("Running Locally")
+            logger.info(f"Local Filepath: {extracted_audio_fpath}")
             srt_result = await asyncio.to_thread(
                 fwhisper.transcribe_to_srt,
                 audio_path=str(extracted_audio_fpath),
@@ -188,12 +194,18 @@ async def convert_to_mp4(
         # 3. Convert video, saving to final converted location
         # If MODAL env variables are available use MODAL
         if USING_MODAL:
+            logger.info("Conversion sent to Modal")
+            logger.info(f"Video Filepath:{tmp_uploaded_vid_loc}")
+            logger.info(f"Output Path: {final_conv_stored_loc}")
             conv_path_obj = await processor.modal_convert_to_mp4(
                 video_fp=str(tmp_uploaded_vid_loc),
                 outpath=str(final_conv_stored_loc)
             )
         # Run Locally
         else:
+            logger.info("Running Locally")
+            logger.info(f"Video Filepath:{tmp_uploaded_vid_loc}")
+            logger.info(f"Output Path: {final_conv_stored_loc}")
             audio_tools = AudioTools(working_dir=op_tmp_dir)
             conv_path_obj = await asyncio.to_thread(
                 audio_tools.to_mp4,

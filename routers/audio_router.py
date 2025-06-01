@@ -104,11 +104,15 @@ async def transcribe_from_audio(
         )
         # When MODAL env variables are available use MODAL
         if USING_MODAL:
+            logger.info("Conversion sent to Modal")
+            logger.info(f"Audio Filepath: {final_audio_storage_loc}")
             transcription_data = await processor.modal_transcribe_to_str(
                 audio_fp=str(final_audio_storage_loc)
             )
         # Run locally
         else:
+            logger.info("Running Locally")
+            logger.info(f"Audio Filepath: {final_audio_storage_loc}")
             transcription_data = await asyncio.to_thread(
                 fwhisper.transcribe_to_str,
                 audio_path=str(final_audio_storage_loc)
