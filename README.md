@@ -1,6 +1,6 @@
 # Mirumoji Backend
 
-> **This is the Python (FastAPI) backend service for the [Mirumoji](https://github.com/svdC1/mirumoji_open_front)** application offering tools for Japanese language immersion.
+> **This is the Python (FastAPI) backend service for the [Mirumoji](https://github.com/svdC1/mirumoji)** application offering tools for Japanese language immersion.
 
 # Setup
 
