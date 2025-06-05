@@ -22,12 +22,12 @@ jobs:
         python -m pip install -r requirements.txt
     - name: Generate NOTICE
       run: |
-        pip-licenses \
-          --with-authors \
-          --with-license-file \
-          --format=md \
-          --output-file ../licenses/NOTICE-backend.txt
-
+            mkdir -p licenses
+            pip-licenses \
+            --with-authors \
+            --with-license-file \
+            --format=markdown \
+            --output-file licenses/NOTICE-backend.md
     # ---------- 2.  Create SBOM & push to GH dependency graph ----------
     - name: Build SPDX SBOM and submit
       uses: anchore/sbom-action@v0
