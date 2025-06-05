@@ -1,37 +1,39 @@
-name: License & SBOM (backend)
+# .github/workflows/licenses-backend.yml
+name: Backend licenses & SBOM
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write # for SBOM submission
-  security-events:  write # to fix GH dependency graph
-
 jobs:
-  scan:
+  backend-licenses:
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v4
-      with: {submodules: recursive}
+      with:
+        submodules: recursive
 
-    # ---------- 1.  Inventory + notice file  ----------
-    - name: Install deps
+    # 2) Install deps + generate NOTICE.md
+    - name: Build NOTICE
       run: |
         python -m pip install -U pip-licenses==5.*
-        python -m pip install -r requirements.txt
-    - name: Generate NOTICE
-      run: |
-            mkdir -p licenses
-            pip-licenses \
-            --with-authors \
-            --with-license-file \
-            --format=markdown \
-            --output-file licenses/NOTICE-backend.md
-    # ---------- 2.  Create SBOM & push to GH dependency graph ----------
-    - name: Build SPDX SBOM and submit
+        python -m pip install -r mirumoji_open_api/requirements.txt
+        pip-licenses \
+          --with-authors \
+          --with-license-file \
+          --format=markdown \
+          --output-file NOTICE-backend.md
+
+    - name: Build SBOM
       uses: anchore/sbom-action@v0
       with:
         format: spdx-json
-        upload-artifact: true          # keeps a copy under “Actions ▸ artifacts”
-        dependency-snapshot: true      # fixes GH’s dependency graph
+        upload-artifact: true         # SBOM
+        dependency-snapshot: false
+
+    # 4) Upload NOTICE.md
+    - name: Upload NOTICE artefact
+      uses: actions/upload-artifact@v4
+      with:
+        name: NOTICE-backend
+        path: NOTICE-backend.md
