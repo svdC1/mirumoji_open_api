@@ -11,9 +11,6 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mirumoji_open_api
     steps:
     - uses: actions/checkout@v4
       with: {submodules: recursive}
