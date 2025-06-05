@@ -25,7 +25,7 @@ jobs:
         pip-licenses \
           --with-authors \
           --with-license-file \
-          --format=notice \
+          --format=md \
           --output-file ../licenses/NOTICE-backend.txt
 
     # ---------- 2.  Create SBOM & push to GH dependency graph ----------
