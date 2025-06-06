@@ -78,7 +78,7 @@ class AudioTools:
                 self.logger.error(f"STDERR: {e.stderr}")
                 error_message = e.stderr.decode()
                 timestamp = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-                with open(self.wd / "error_log.txt",
+                with open(self.working_dir / "error_log.txt",
                           "w", encoding="utf-8") as log_file:
                     log_file.write(
                         f"{timestamp} FFmpeg error:\n{error_message}\n\n")
@@ -173,7 +173,7 @@ class AudioTools:
         output_path: str | None = None,
         resolution: str = "1280x720",
         target_bitrate: str = "2500k",
-        use_nvenc: bool = False,          # ← NEW FLAG
+        use_nvenc: bool = False,
     ) -> pathlib.Path | None:
         """
         Convert any video to MP4 (H.264 + AAC) that streams well in <video>.

@@ -74,15 +74,14 @@ class WordInfoService:
 
 class GptExplainService:
     """
-    Service to generate sentence breakdowns and grammar explanations
-    using Cure Dolly's native-based model through the GPT wrapper.
+    Service to generate sentence breakdowns and grammar explanations.
     """
 
     def __init__(self,
                  gpt_model: Optional[GptModel] = None,
                  gpt_model_kwargs: Dict = {},
                  version: str = "gpt-4.1-mini",):
-        # Cure Dolly-style system message
+        # Default system message
         system_msg = """
         You are a Japanese language API that explains the specific nuance of
         specified word(s) in a Japanese sentence.
@@ -105,7 +104,8 @@ class GptExplainService:
                 sentence: str,
                 focus: str) -> str:
         """
-        Request an explanation from GPT using Cure Dolly's teaching style.
+        Request an explanation from GPT using default system message
+        and prompt.
 
         Args:
             sentence (str): The full Japanese sentence.
@@ -126,7 +126,7 @@ class GptExplainService:
                        sysMsg: str,
                        prompt: str) -> Optional[str]:
         """
-        Request an explanation from GPT using Cure Dolly's teaching style.
+        Request an explanation from GPT using custom system message and prompt.
 
         Args:
             sentence (str): The full Japanese sentence.
@@ -147,9 +147,8 @@ class GptExplainService:
 
     def explain_sentence(self, sentence: str) -> str:
         """
-        Request a Cure Dolly-style breakdown from GPT for a full sentence,
-        without requiring a focus word. Useful for subtitle or transcription
-        input.
+        Request a breakdown from GPT for a full sentence,
+        without requiring a focus word.
 
         Args:
             sentence (str): A potentially long or informal Japanese sentence.
@@ -169,7 +168,8 @@ class GptExplainService:
                                 sysMsg: str,
                                 prompt: str) -> Optional[str]:
         """
-        Request an explanation from GPT using Cure Dolly's teaching style.
+        Request an explanation from GPT using custom system message and prompt
+        without any focus words.
 
         Args:
             sentence (str): The full Japanese sentence.
@@ -226,7 +226,7 @@ class SentenceBreakdownService:
     def explain(self, sentence: str,
                 focus: Optional[str] = None) -> Dict:
         """
-        Perform a complete sentence breakdown using Cure Dolly-style GPT logic.
+        Perform a complete sentence breakdown
 
         Args:
             sentence (str): The full Japanese sentence to analyze.
